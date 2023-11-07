@@ -15,7 +15,7 @@ from model import QNet
 from typing import Callable
 
 models_dir = 'res'
-model_path = f'{models_dir}/rl_model_200000_steps'
+model_path = f'{models_dir}/rl_model_3850000_steps'
 
 env = Tetris()
 obs = env.reset()

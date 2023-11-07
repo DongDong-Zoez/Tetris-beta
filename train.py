@@ -1,67 +1,72 @@
 from stable_baselines3 import PPO, A2C, DQN
-from stable_baselines3.common.env_util import make_vec_env
-from stable_baselines3.common.evaluation import evaluate_policy
-from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
-from stable_baselines3.common.utils import set_random_seed
-from stable_baselines3.common.evaluation import evaluate_policy
-from stable_baselines3.common.env_util import make_vec_env
-from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.callbacks import CheckpointCallback, EveryNTimesteps
-import gym
-import time
-import torch
-import torch.nn as nn
-
 from tetris import Tetris
 from model import QNet
 
-from typing import Callable
+import argparse
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="DQN Model")
 
+    parser.add_argument("--device", type=str, default="cuda:6", help="Device for training")
+    parser.add_argument("--timesteps", type=int, default=1e10, help="Number of timesteps")
+    parser.add_argument("--seed", type=int, default=42, help="Number of timesteps")
+    parser.add_argument("--learning_rate", type=float, default=5e-4, help="Learning rate")
+    parser.add_argument("--batch_size", type=int, default=4096, help="Batch size")
+    parser.add_argument("--buffer_size", type=int, default=600000, help="Replay buffer size")
+    parser.add_argument("--learning_starts", type=int, default=0, help="Number of timesteps before learning starts")
+    parser.add_argument("--target_update_interval", type=int, default=10000, help="Interval for target network updates")
+    parser.add_argument("--train_freq", type=int, default=1000, help="Frequency of training steps")
+    parser.add_argument("--save_freq", type=int, default=1e6, help="Frequency of saving model")
+    parser.add_argument("--log_freq", type=int, default=10, help="Frequency of logging info")
+    parser.add_argument("--exploration_final_eps", type=float, default=0.0, help="Final exploration epsilon")
+    parser.add_argument("--exploration_fraction", type=float, default=1e-4, help="Exploration fraction")
+    parser.add_argument("--features_dim", type=int, default=128, help="Dimension of features extracted by QNet")
+    parser.add_argument("--verbose", type=int, default=1, help="Verbosity level")
+    parser.add_argument("--save_path", type=str, default="res2", help="Output dir to saving model")
+    parser.add_argument("--tensorboard_log", type=str, default="./tensorboard/Tetris-v0/", help="Tensorboard log directory")
 
+    args = parser.parse_args()
+    return args
 
 def main():
     # env_id = "Tetris-v0"
     # env = gym.make(env_id)
     env = Tetris()
-    # num_cpu = 8
-    # env = SubprocVecEnv([lambda: env for _ in range(num_cpu)])
+    args = parse_args()
 
-    checkpoint_on_event = CheckpointCallback(save_freq=1, save_path="res/")
-    event_callback = EveryNTimesteps(n_steps=1e5, callback=checkpoint_on_event)
+    checkpoint_on_event = CheckpointCallback(save_freq=1, save_path=args.save_path)
+    event_callback = EveryNTimesteps(n_steps=args.save_freq, callback=checkpoint_on_event)
+
+    policy_kwargs = {
+        "features_extractor_class": QNet,
+        "features_extractor_kwargs": {
+            "features_dim": args.features_dim
+        }
+    }
 
     model = DQN(
         "CnnPolicy", 
         env=env, 
-        device="cuda:7",
-        learning_rate=5e-4,
-        batch_size=2048,
-        buffer_size=300000,
-        learning_starts=0,
-        target_update_interval=1000,
-        train_freq=1000,
-        policy_kwargs={
-            "features_extractor_class": QNet,
-            "features_extractor_kwargs": {
-                "features_dim": 128
-            },
-            # "net_arch": [],
-        },
-        verbose=0,
-        tensorboard_log="./tensorboard/Tetris-v0/"
+        device=args.device,
+        seed=args.seed,
+        learning_rate=args.learning_rate,
+        batch_size=args.batch_size,
+        buffer_size=args.buffer_size,
+        learning_starts=args.learning_starts,
+        target_update_interval=args.target_update_interval,
+        train_freq=args.train_freq,
+        exploration_final_eps=args.exploration_final_eps,
+        exploration_fraction=args.exploration_fraction,
+        policy_kwargs=policy_kwargs,
+        verbose=args.verbose,
+        tensorboard_log=args.tensorboard_log
     )
-    # model.q_net.q_net = nn.Sequential(
-    #     nn.Linear(7040, 7)
-    # )
-    # print(model.q_net)
-    # return 
 
-    obs = env.reset()
-    model.learn(total_timesteps=1e10, callback=event_callback)
-    model.save(f'res/model')
+    env.reset()
+    model.learn(total_timesteps=args.timesteps, callback=event_callback, log_interval=args.log_freq)
+    model.save(f'{args.save_path}/model')
 
-    # mean_reward, std_reward = evaluate_policy(model, env, n_eval_episodes=10, render=False)
-    # print(f"Model {i}:", mean_reward, std_reward)
     env.close()
 
 if __name__ == "__main__":
