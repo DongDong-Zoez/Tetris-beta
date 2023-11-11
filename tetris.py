@@ -149,6 +149,7 @@ class Tetris(gym.Env):
         self.board.render()
         if mode == "human":
             status = self.gameStatus
+            features = self.make_features(status)
             lineElimination = status["lineElimination"]
             holeDeviation = status["holeDeviation"]
             alreadyHold = status["alreadyHold"]
@@ -163,6 +164,7 @@ class Tetris(gym.Env):
             print("Hole deviation : ", holeDeviation, " " * 10)
             print("Num hole : ", np.sum(holeMask), " " * 10)
             print("Current height: ", max(currentHeight), " " * 10)
+            print(features[...,-1])
 
     def close(self):
         pass

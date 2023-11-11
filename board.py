@@ -278,6 +278,7 @@ class BoardData(object):
             self.currentX = nextX
             self.currentY = nextY
             self.getShadow()
+            self.getCurrentShapeBoard()
             self.recordMove(nextShape, nextDirection, nextX, nextY)
             return True
         else:

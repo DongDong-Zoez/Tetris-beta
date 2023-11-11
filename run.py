@@ -9,7 +9,7 @@ def parse_args():
     parser.add_argument('--model_path', type=str, default="res", help='Path to the RL model file')
     parser.add_argument('--device', type=str, default='cuda:1', help='Device to run the model on')
     parser.add_argument('--sleep_time', type=float, default=0.003, help='Sleep time in seconds between rendering steps')
-    parser.add_argument('--num_steps', type=int, default=35500000, help='Number of steps for the model')
+    parser.add_argument('--num_steps', type=int, default=37300000, help='Number of steps for the model')
     return parser.parse_args()
 
 def main():
