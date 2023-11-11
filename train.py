@@ -12,18 +12,19 @@ def parse_args():
     parser.add_argument("--timesteps", type=int, default=1e10, help="Number of timesteps")
     parser.add_argument("--seed", type=int, default=42, help="Number of timesteps")
     parser.add_argument("--learning_rate", type=float, default=5e-4, help="Learning rate")
-    parser.add_argument("--batch_size", type=int, default=4096, help="Batch size")
-    parser.add_argument("--buffer_size", type=int, default=600000, help="Replay buffer size")
+    parser.add_argument("--batch_size", type=int, default=8192, help="Batch size")
+    parser.add_argument("--buffer_size", type=int, default=1000000, help="Replay buffer size")
     parser.add_argument("--learning_starts", type=int, default=0, help="Number of timesteps before learning starts")
-    parser.add_argument("--target_update_interval", type=int, default=10000, help="Interval for target network updates")
+    parser.add_argument("--target_update_interval", type=int, default=100000, help="Interval for target network updates")
     parser.add_argument("--train_freq", type=int, default=1000, help="Frequency of training steps")
-    parser.add_argument("--save_freq", type=int, default=1e6, help="Frequency of saving model")
+    parser.add_argument("--save_freq", type=int, default=1e5, help="Frequency of saving model")
     parser.add_argument("--log_freq", type=int, default=10, help="Frequency of logging info")
+    parser.add_argument("--exploration_initial_eps", type=float, default=1, help="Initial exploration epsilon")
     parser.add_argument("--exploration_final_eps", type=float, default=0.0, help="Final exploration epsilon")
-    parser.add_argument("--exploration_fraction", type=float, default=1e-4, help="Exploration fraction")
+    parser.add_argument("--exploration_fraction", type=float, default=2e-3, help="Exploration fraction")
     parser.add_argument("--features_dim", type=int, default=128, help="Dimension of features extracted by QNet")
     parser.add_argument("--verbose", type=int, default=1, help="Verbosity level")
-    parser.add_argument("--save_path", type=str, default="res2", help="Output dir to saving model")
+    parser.add_argument("--save_path", type=str, default="res3", help="Output dir to saving model")
     parser.add_argument("--tensorboard_log", type=str, default="./tensorboard/Tetris-v0/", help="Tensorboard log directory")
 
     args = parser.parse_args()
@@ -56,13 +57,14 @@ def main():
         learning_starts=args.learning_starts,
         target_update_interval=args.target_update_interval,
         train_freq=args.train_freq,
+        exploration_initial_eps=args.exploration_initial_eps,
         exploration_final_eps=args.exploration_final_eps,
         exploration_fraction=args.exploration_fraction,
         policy_kwargs=policy_kwargs,
         verbose=args.verbose,
         tensorboard_log=args.tensorboard_log
     )
-
+    model.load("res2/rl_model_22800000_steps")
     env.reset()
     model.learn(total_timesteps=args.timesteps, callback=event_callback, log_interval=args.log_freq)
     model.save(f'{args.save_path}/model')

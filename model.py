@@ -7,7 +7,7 @@ from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 
 class QNet(BaseFeaturesExtractor):
 
-    FILTERS = (60, 128, 256, 40)
+    FILTERS = (62, 128, 256, 40)
 
     def __init__(self, observation_space: gym.spaces.Box, features_dim: int = 7):
         super(QNet, self).__init__(observation_space, features_dim)

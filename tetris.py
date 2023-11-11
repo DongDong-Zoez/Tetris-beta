@@ -11,7 +11,7 @@ from utils import pretty_print
 
 class Tetris(gym.Env):
 
-    def __init__(self, rows = 22, columns = 10, in_channels = 60, future_steps=4, future_shapes=5, verbose=0):
+    def __init__(self, rows = 22, columns = 10, in_channels = 62, future_steps=4, future_shapes=5, verbose=0):
         super(Tetris, self).__init__()
 
         self.observation_space = spaces.Box(low=0, high=255, shape=(rows, columns, in_channels), dtype=np.uint8)
@@ -28,6 +28,14 @@ class Tetris(gym.Env):
             6: self.board.dropDown
         }
         self.action_name = ["Rotate Right", "Move Down", "Move Left", "Move Right", "Hold", "Rotate Left", "Drop Down"]
+        self.lineEliminationScore = [0, 3, 9, 27, 81]
+        self.heightScore = [
+            3, 3, 3, 3, 3,
+            2, 2, 2, 1.5, 1.5,
+            1, 1, .8, .7, .6, 
+            .5, .4, .3, .3, .3,
+            .3, .3
+        ]
 
         self.action_stats = [0 for _ in range(7)]
 
@@ -69,6 +77,8 @@ class Tetris(gym.Env):
     def make_features(self, observation):
         self.history_observation.pop(0)
         self.history_observation.append(observation["board"])
+        self.shadowBoard = observation["shadowBoard"]
+        self.currentShapeBoard = observation["currentShapeBoard"]
         self.currentDirection = self.__to_dummy(observation["currentDirection"], 4)
         self.currentShape = observation["currentShape"]
         self.holdShape = observation["holdShape"]
@@ -76,11 +86,15 @@ class Tetris(gym.Env):
         self.nextShape = observation["nextShape"]
         self.holeMask = observation["holeMask"]
 
-        features = torch.ones((self.in_channels, self.rows, self.columns)) * 255
+        features = torch.ones((self.in_channels, self.rows, self.columns))
         index = 0
         for i in range(self.future_steps):
             features[index] = torch.tensor(self.history_observation[i]).view(self.rows, self.columns)
             index += 1
+        features[index] = torch.tensor(self.shadowBoard).view(self.rows, self.columns)
+        index += 1
+        features[index] = torch.tensor(self.currentShapeBoard).view(self.rows, self.columns) 
+        index += 1
         for i in range(len(self.currentDirection)):
             features[index] *= self.currentDirection[i]
             index += 1
@@ -99,7 +113,6 @@ class Tetris(gym.Env):
         features[index + 2] *= self.holeMask
 
         return features.permute(1,2,0).numpy()
-        # return features
     
     def calcReward(self, status, action):
 
@@ -116,16 +129,16 @@ class Tetris(gym.Env):
         self.action_stats[action] += 1
 
         # reward -= np.sum(np.abs(np.diff(height))) * 10
-        reward -= 5 if action == 4 and alreadyHold else reward
+        # reward -= 5 if action == 4 and alreadyHold else reward
         # reward = reward + 1 if action == 2 or action == 3 else reward
-        reward = reward - 100 if terminated else reward
-        # reward = reward - (np.max(height) - np.min(height)) if action == 6 else reward
-        # reward = reward + min(currentHeight) / 2 if action == 6 else reward
+        reward = reward - 20 if terminated else reward
+        reward = reward + max(currentHeight) / 6 if action == 6 else reward
         # reward -= np.max(height) / 10
-        reward += 100 * (lineElimination ** 2)
-        reward += holeDeviation
-        # reward -= max(0, np.log(np.sum(holeMask) - self.numHole + 12)) * 2
-        # self.numHole = np.sum(holeMask)
+        reward += self.lineEliminationScore[lineElimination] * self.heightScore[(self.rows - max(currentHeight) - 1)]
+        reward += holeDeviation * (holeDeviation < 0) / 2
+        holeCounts = (np.sum(holeMask) - self.numHole)
+        reward -= np.log((holeCounts > 0) * holeCounts + 1) * 8
+        self.numHole = np.sum(holeMask)
 
         return reward / 10
     
@@ -135,18 +148,21 @@ class Tetris(gym.Env):
     def render(self, mode="ai"):
         self.board.render()
         if mode == "human":
-            lineElimination = self.gameStatus["lineElimination"]
-            holeDeviation = self.gameStatus["holeDeviation"]
-            alreadyHold = self.gameStatus["alreadyHold"]
-            terminated = self.gameStatus["terminated"]
+            status = self.gameStatus
+            lineElimination = status["lineElimination"]
+            holeDeviation = status["holeDeviation"]
+            alreadyHold = status["alreadyHold"]
+            terminated = status["terminated"]
+            holeMask = status["holeMask"]
+            terminated = status["terminated"]
+            height = status["height"]
+            currentHeight = status["currentHeight"]
+
             print("Line eliminated: ", lineElimination, " " * 10)
+            print("Line score: ", self.lineEliminationScore[lineElimination] * self.heightScore[(self.rows - max(currentHeight) - 1)], " " * 10)
             print("Hole deviation : ", holeDeviation, " " * 10)
-            print("Num hole : ", self.numHole, " " * 10)
-            print("Already hold   : ", alreadyHold, " " * 10)
-            print("Terminated     : ", terminated, " " * 10)
-            print("Episode        : ", self.episodes, "         ")
-            print("Episode Reward : ", self.episodeReward, "         ")
-            print("Except  Reward : ", self.expectReward, "         ")
+            print("Num hole : ", np.sum(holeMask), " " * 10)
+            print("Current height: ", max(currentHeight), " " * 10)
 
     def close(self):
         pass

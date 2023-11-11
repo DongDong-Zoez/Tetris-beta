@@ -1,33 +1,38 @@
-from stable_baselines3 import PPO, A2C, DQN
-from stable_baselines3.common.env_util import make_vec_env
-from stable_baselines3.common.evaluation import evaluate_policy
-from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
-from stable_baselines3.common.utils import set_random_seed
-from stable_baselines3.common.evaluation import evaluate_policy
-from stable_baselines3.common.env_util import make_vec_env
-import gym
+import argparse
+from stable_baselines3 import DQN
 import time
-import torch
 
 from tetris import Tetris
-from model import QNet
 
-from typing import Callable
+def parse_args():
+    parser = argparse.ArgumentParser(description="Run the Tetris RL model.")
+    parser.add_argument('--model_path', type=str, default="res", help='Path to the RL model file')
+    parser.add_argument('--device', type=str, default='cuda:1', help='Device to run the model on')
+    parser.add_argument('--sleep_time', type=float, default=0.003, help='Sleep time in seconds between rendering steps')
+    parser.add_argument('--num_steps', type=int, default=35500000, help='Number of steps for the model')
+    return parser.parse_args()
 
-models_dir = 'res'
-model_path = f'{models_dir}/rl_model_3850000_steps'
+def main():
+    args = parse_args()
 
-env = Tetris()
-obs = env.reset()
+    env = Tetris()
+    obs = env.reset()
 
-model = DQN.load(model_path, env=env, device="cuda:1")
+    model_path = f'{args.model_path}/rl_model_{args.num_steps}_steps'
 
-done = False
-while True:
-    action, _states = model.predict(obs, deterministic=True)
-    obs, reward, done, truncated = env.step(action)
-    if done or truncated:
-        obs = env.reset()
-    env.render()
-    time.sleep(0.003)
-env.close()
+    model = DQN.load(model_path, env=env, device=args.device)
+
+    done = False
+    step_count = 0
+    while step_count < args.num_steps:
+        action, _states = model.predict(obs, deterministic=True)
+        obs, reward, done, truncated = env.step(action)
+        if done or truncated:
+            obs = env.reset()
+        env.render()
+        time.sleep(args.sleep_time)
+        step_count += 1
+    env.close()
+
+if __name__ == "__main__":
+    main()

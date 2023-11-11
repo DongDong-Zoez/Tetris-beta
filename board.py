@@ -13,6 +13,33 @@ class Tetriminos(object):
     shapeT = 6
     shapeZ = 7
     shapeAlpha = ["NN", "II", "JJ", "LL", "OO", "SS", "TT", "ZZ"]
+    shapeColor = {
+        "XX": '\033[48;2;128;128;128m  \033[0m',
+        "NN": '\033[48;2;0;0;0m  \033[0m',
+        "Bb": '\033[38;2;108;234;255m▄▄\033[0m',
+        "Tt": '\033[38;2;108;234;255m▀▀\033[0m',
+        "ZZ": '\033[48;2;255;127;121m  \033[0m',
+        "LL": '\033[48;2;255;186;89m  \033[0m',
+        "OO": '\033[48;2;255;255;127m  \033[0m',
+        "SS": '\033[48;2;132;248;128m  \033[0m',
+        "II": '\033[48;2;108;234;255m  \033[0m',
+        "JJ": '\033[48;2;51;155;255m  \033[0m',
+        "TT": '\033[48;2;217;88;233m  \033[0m',
+    }
+
+    shapeShadowColor = {
+        "XX": '\033[38;2;128;128;128m  \033[0m',
+        "NN": '\033[38;2;0;0;0m  \033[0m',
+        "Bb": '\033[38;2;108;234;255m▄▄\033[0m',
+        "Tt": '\033[38;2;108;234;255m▀▀\033[0m',
+        "ZZ": '\033[38;2;255;127;121m  \033[0m',
+        "LL": '\033[38;2;255;186;89m  \033[0m',
+        "OO": '\033[38;2;255;255;127m  \033[0m',
+        "SS": '\033[38;2;132;248;128m  \033[0m',
+        "II": '\033[38;2;108;234;255m  \033[0m',
+        "JJ": '\033[38;2;51;155;255m  \033[0m',
+        "TT": '\033[38;2;217;88;233m  \033[0m',
+    }
 
     shapeStr = (
         "                ",
@@ -144,16 +171,16 @@ class Tetriminos(object):
         )
     )
 
-    shapeColor = [
-        (0, 0, 0), # None
-        (108, 234, 255), # I
-        (51, 155, 255), # J
-        (255, 186, 89), # L 
-        (255, 255, 127), # O
-        (132, 248, 128), # S
-        (217, 88, 233), # T
-        (255, 127, 121), # Z
-    ]
+    # shapeColor = [
+    #     (0, 0, 0), # None
+    #     (108, 234, 255), # I
+    #     (51, 155, 255), # J
+    #     (255, 186, 89), # L 
+    #     (255, 255, 127), # O
+    #     (132, 248, 128), # S
+    #     (217, 88, 233), # T
+    #     (255, 127, 121), # Z
+    # ]
 
 class Shape(Tetriminos):
 
@@ -196,6 +223,8 @@ class BoardData(object):
 
     def __init__(self, rows=22, columns=10):
         self.board = [0] * rows * columns
+        self.shadowBoard = [0] * rows * columns
+        self.currentShapeBoard = [0] * rows * columns
         self.rows = rows
         self.columns = columns
         self.currentX = -1
@@ -230,6 +259,8 @@ class BoardData(object):
             self.currentShape = nextShape
             self.nextShape = Shape(self.permutation[0])
             self.nextPermutation = self.nextPermutation if self.nextPermutation else [*random.choice(self.permutationTable)]
+            self.getShadow()
+            self.getCurrentShapeBoard()
             self.recordMove(self.currentShape, self.currentDirection, self.currentX, self.currentY)
             self.alreadyHold = False
         else:
@@ -246,6 +277,7 @@ class BoardData(object):
             self.currentDirection = nextDirection
             self.currentX = nextX
             self.currentY = nextY
+            self.getShadow()
             self.recordMove(nextShape, nextDirection, nextX, nextY)
             return True
         else:
@@ -296,6 +328,21 @@ class BoardData(object):
             if self.board[dx + dy * self.columns] > 0:
                 return False
         return True
+    
+    def getShadow(self):
+        self.shadowBoard = [0] * self.rows * self.columns
+        shadowShape, shadowX, shadowY, shadowDirection = self.currentShape, self.currentX, self.currentY, self.currentDirection
+        while self.sanityMove(shadowShape, shadowDirection, shadowX, shadowY + 1):
+            shadowY += 1
+        for dx, dy in shadowShape.getCoords(shadowDirection, shadowX, shadowY):
+            self.shadowBoard[dx + dy * self.columns] = self.currentShape.shape
+
+    def getCurrentShapeBoard(self):
+        self.currentShapeBoard = [0] * self.rows * self.columns
+        for dx, dy in self.currentShape.getCoords(self.currentDirection, self.currentX, self.currentY):
+            self.currentShapeBoard[dx + dy * self.columns] = self.currentShape.shape
+        
+
     
     def dropDown(self):
 
@@ -474,6 +521,10 @@ class BoardData(object):
         self.currentDirection = 0
         self.currentShape = Shape()
 
+    def maskBoard(self, board):
+        newboard = [(x != 0) * 1 for x in board]
+        return newboard
+
     def reset(self):
         self.currentX = -1
         self.currentY = -1
@@ -487,6 +538,8 @@ class BoardData(object):
         self.currentShape = Shape()
         self.terminated = False
         self.board = [0] * self.columns * self.rows
+        self.shadowBoard = [0] * self.columns * self.rows
+        self.currentShapeBoard = [0] * self.columns * self.rows
         self.permutation = [*random.choice(self.permutationTable)]
         self.nextPermutation = [*random.choice(self.permutationTable)]
         self.currentShape = Shape(0)
@@ -495,7 +548,9 @@ class BoardData(object):
 
     def status(self):
         return {
-            "board": self.board,
+            "board": self.maskBoard(self.board),
+            "shadowBoard": self.maskBoard(self.shadowBoard),
+            "currentShapeBoard": self.maskBoard(self.currentShapeBoard),
             "currentDirection": self.currentDirection,
             "currentShape": self.currentShape.values,
             "holdShape": self.holdShape.values,
@@ -509,11 +564,14 @@ class BoardData(object):
             "terminated": self.terminated,
         }
 
-    def to_str(self):
+    def to_str(self, board):
         frame = ""
         lines = []
         for i in range(self.rows):
-            lines.append("".join(map(lambda x: Tetriminos.shapeAlpha[x], self.board[self.columns*i:self.columns*(i+1)])))
+            line = list(map(lambda x: Tetriminos.shapeAlpha[x], board[self.columns*i:self.columns*(i+1)]))
+            lineShadow = list(map(lambda x: Tetriminos.shapeAlpha[x], self.shadowBoard[self.columns*i:self.columns*(i+1)]))
+            line = [Tetriminos.shapeShadowColor[xs].replace("  ", "░░") if x == "NN" and xs != "NN" else x for x, xs in zip(line, lineShadow)]
+            lines.append("".join(line))
         lines.append("XX" * self.columns)
         lines[0] = "XX" * 6 + lines[0]
         lines[1] = "XX" + str(self.holdShape)[:8] + "XX" + lines[1]
@@ -532,21 +590,25 @@ class BoardData(object):
         return frame
     
     def render(self):
-        frame = self.to_str()
+        frame = self.to_str(self.board)
 
-        frame = frame.replace("XX", f'\033[48;2;128;128;128m  \033[0m')
-        frame = frame.replace("NN", f'\033[48;2;0;0;0m  \033[0m')
+        for marker, replacement in Tetriminos.shapeColor.items():
+            frame = frame.replace(marker, replacement)
 
-        frame = frame.replace('Bb', f'\033[38;2;108;234;255m▄▄\033[0m')
-        frame = frame.replace('Tt', f'\033[38;2;108;234;255m▀▀\033[0m')
+        # ░░
+        # frame = frame.replace("XX", f'\033[48;2;128;128;128m  \033[0m')
+        # frame = frame.replace("NN", f'\033[48;2;0;0;0m  \033[0m')
 
-        frame = frame.replace('ZZ', f'\033[48;2;255;127;121m  \033[0m')
-        frame = frame.replace('LL', f'\033[48;2;255;186;89m  \033[0m')
-        frame = frame.replace('OO', f'\033[48;2;255;255;127m  \033[0m')
-        frame = frame.replace('SS', f'\033[48;2;132;248;128m  \033[0m')
-        frame = frame.replace('II', f'\033[48;2;108;234;255m  \033[0m')
-        frame = frame.replace('JJ', f'\033[48;2;51;155;255m  \033[0m')
-        frame = frame.replace('TT', f'\033[48;2;217;88;233m  \033[0m')
+        # frame = frame.replace('Bb', f'\033[38;2;108;234;255m▄▄\033[0m')
+        # frame = frame.replace('Tt', f'\033[38;2;108;234;255m▀▀\033[0m')
+
+        # frame = frame.replace('ZZ', f'\033[48;2;255;127;121m  \033[0m')
+        # frame = frame.replace('LL', f'\033[48;2;255;186;89m  \033[0m')
+        # frame = frame.replace('OO', f'\033[48;2;255;255;127m  \033[0m')
+        # frame = frame.replace('SS', f'\033[48;2;132;248;128m  \033[0m')
+        # frame = frame.replace('II', f'\033[48;2;108;234;255m  \033[0m')
+        # frame = frame.replace('JJ', f'\033[48;2;51;155;255m  \033[0m')
+        # frame = frame.replace('TT', f'\033[48;2;217;88;233m  \033[0m')
 
         print('\033[1;1H', frame, sep='')
 
